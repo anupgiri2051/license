@@ -72,8 +72,30 @@
   </footer>
 
   <script>
-    // Live Published Google Sheet CSV URL
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+    // Live Published Google Sheet URL
+    const RAW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+
+    // Auto-fallback endpoints to guarantee local file:/// compatibility
+    const URLS_TO_TRY = [
+      RAW_URL,
+      "https://corsproxy.io/?" + encodeURIComponent(RAW_URL),
+      "https://api.allorigins.win/raw?url=" + encodeURIComponent(RAW_URL)
+    ];
+
+    async function fetchCSVData() {
+      for (const url of URLS_TO_TRY) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 50) return text;
+          }
+        } catch (e) {
+          console.warn("Retrying fetch via fallback proxy...", e);
+        }
+      }
+      throw new Error("Unable to fetch data.");
+    }
 
     async function checkLicense(event) {
       event.preventDefault();
@@ -86,16 +108,19 @@
       searchBtn.innerText = "खोज्दैछ... (Searching...)";
 
       try {
-        const response = await fetch(GOOGLE_SHEET_CSV_URL);
-        const csvText = await response.text();
+        const csvText = await fetchCSVData();
 
         const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
         const database = parsed.data;
 
-        // Search in database
+        // Clean input for comparison
+        const cleanInput = inputVal.replace(/[^A-Z0-9]/g, "");
+
+        // Search matching number
         const match = database.find(item => {
           const lNo = item.number || item.LicenseNo || item["लाइसेन्स नं"] || "";
-          return lNo.trim().toUpperCase() === inputVal;
+          const cleanLNo = lNo.toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+          return cleanLNo === cleanInput && cleanInput.length > 0;
         });
 
         resultBox.classList.remove("hidden");
@@ -104,14 +129,14 @@
           resultBox.innerHTML = `
             <div class="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900">
               <h3 class="font-bold text-base text-emerald-900 mb-2">✅ लाइसेन्स कार्यालयमा उपलब्ध छ!</h3>
-              <div class="space-y-1 text-xs bg-white/80 p-3 rounded-lg border border-emerald-200 font-mono">
+              <div class="space-y-1 text-xs bg-white/80 p-3 rounded-lg border border-emerald-200 font-mono text-left">
                 <p><strong>नाम:</strong> ${match.app_name || match.Name || match['नाम'] || 'N/A'}</p>
                 <p><strong>लाइसेन्स नं:</strong> ${match.number || match.LicenseNo || inputVal}</p>
                 <p><strong>वर्ग (Category):</strong> ${match.category || 'N/A'}</p>
                 <p><strong>प्राप्त मिति:</strong> ${match.office_visit_date || match.PrintDate || 'N/A'}</p>
                 <p><strong>Box No:</strong> ${match.box_no || 'N/A'}</p>
               </div>
-              <p class="mt-3 text-xs font-semibold text-emerald-800">
+              <p class="mt-3 text-xs font-semibold text-emerald-800 text-center">
                 👉 तपाईं यातायात व्यवस्था कार्यालय, बागलुङमा गई कार्ड बुझिलिन सक्नुहुन्छ।
               </p>
             </div>
@@ -120,7 +145,7 @@
           resultBox.innerHTML = `
             <div class="p-4 bg-rose-50 border border-rose-300 rounded-xl text-rose-900">
               <h3 class="font-bold text-base text-rose-900 mb-1">⏳ कार्यालयमा आइपुगेको छैन</h3>
-              <p class="text-xs text-rose-800">
+              <p class="text-xs text-rose-800 text-center">
                 तपाईंले खोज्नुभएको लाइसेन्स नम्बर <strong>${inputVal}</strong> अझै बागलुङ कार्यालयमा प्राप्त भएको विवरणमा भेटिएन।
               </p>
             </div>
@@ -129,7 +154,7 @@
       } catch (error) {
         resultBox.classList.remove("hidden");
         resultBox.innerHTML = `
-          <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+          <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 text-center">
             डेटाबेससँग जोडिन सकेन। कृपया इन्टरनेट जाँच गरी पुनः प्रयास गर्नुहोला।
           </div>
         `;
