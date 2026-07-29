@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Portal - Smart License Management</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- XLSX Library to read local Excel files -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- PapaParse for Google Sheets CSV parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
   <style> body { font-family: 'Mukta', sans-serif; } </style>
@@ -60,15 +62,46 @@
 
     <main class="max-w-5xl mx-auto p-4 space-y-6">
 
+      <!-- EXCEL IMPORT SECTION -->
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">📁 Import New Excel Files (.xlsx / .xls)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Upload additional Excel files here to parse and append/merge with your active database.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-3">
+          <input 
+            type="file" 
+            id="excelFileInput" 
+            accept=".xlsx, .xls" 
+            multiple
+            class="block w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-900 p-1"
+          />
+          <button 
+            onclick="processExcelFiles()" 
+            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg shadow transition whitespace-nowrap">
+            📥 Import Excel Data
+          </button>
+        </div>
+
+        <div id="uploadStatus" class="hidden text-xs p-3 rounded-lg border"></div>
+      </div>
+
+      <!-- LIVE DATABASE TABLE SECTION -->
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
         <div class="flex justify-between items-center mb-4">
           <div>
             <h2 class="text-lg font-bold text-white">Live Database View</h2>
             <p class="text-xs text-slate-400">कुल रेकर्ड: <span id="totalCount" class="font-bold text-emerald-400">0</span></p>
           </div>
-          <button onclick="loadLiveDatabase()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
-            🔄 Refresh Data
-          </button>
+          <div class="flex gap-2">
+            <button onclick="exportMergedCSV()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
+              💾 Export CSV
+            </button>
+            <button onclick="loadLiveDatabase()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
+              🔄 Refresh Data
+            </button>
+          </div>
         </div>
 
         <div class="overflow-x-auto max-h-96 border border-slate-700 rounded-lg">
@@ -100,10 +133,18 @@
   </footer>
 
   <script>
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+    const RAW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+
+    const URLS_TO_TRY = [
+      RAW_URL,
+      "https://corsproxy.io/?" + encodeURIComponent(RAW_URL),
+      "https://api.allorigins.win/raw?url=" + encodeURIComponent(RAW_URL)
+    ];
 
     const AUTH_USER = "admin";
     const AUTH_PASS = "522051";
+
+    let combinedDatabase = [];
 
     function handleLogin(e) {
       e.preventDefault();
@@ -123,37 +164,127 @@
       document.getElementById("loginOverlay").classList.remove("hidden");
     }
 
+    async function fetchCSVData() {
+      for (const url of URLS_TO_TRY) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 50) return text;
+          }
+        } catch (e) {
+          console.warn("Fetch failed for URL:", url, e);
+        }
+      }
+      throw new Error("Unable to fetch data from all endpoints.");
+    }
+
     async function loadLiveDatabase() {
       const tbody = document.getElementById("dataTableBody");
       const totalCount = document.getElementById("totalCount");
 
       try {
-        const response = await fetch(GOOGLE_SHEET_CSV_URL);
-        const csvText = await response.text();
+        const csvText = await fetchCSVData();
         const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-        const data = parsed.data;
+        combinedDatabase = parsed.data;
 
-        totalCount.innerText = data.length;
-
-        if (data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">खाली छ।</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = data.slice(0, 500).map((item, idx) => `
-          <tr class="hover:bg-slate-700/50">
-            <td class="p-2.5 text-slate-500">${idx + 1}</td>
-            <td class="p-2.5 font-mono text-amber-400 font-bold">${item.number || item.LicenseNo || 'N/A'}</td>
-            <td class="p-2.5">${item.app_name || item.Name || 'N/A'}</td>
-            <td class="p-2.5 text-slate-300">${item.category || 'N/A'}</td>
-            <td class="p-2.5 text-slate-400">${item.office_visit_date || item.PrintDate || 'N/A'}</td>
-            <td class="p-2.5 text-emerald-400 font-semibold">${item.box_no || 'N/A'}</td>
-          </tr>
-        `).join("");
-
+        renderTable();
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-400">Error loading data.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-400">Error loading database.</td></tr>`;
       }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("dataTableBody");
+      const totalCount = document.getElementById("totalCount");
+
+      totalCount.innerText = combinedDatabase.length;
+
+      if (combinedDatabase.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">खाली छ।</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = combinedDatabase.slice(0, 500).map((item, idx) => `
+        <tr class="hover:bg-slate-700/50">
+          <td class="p-2.5 text-slate-500">${idx + 1}</td>
+          <td class="p-2.5 font-mono text-amber-400 font-bold">${item.number || item.LicenseNo || 'N/A'}</td>
+          <td class="p-2.5">${item.app_name || item.Name || 'N/A'}</td>
+          <td class="p-2.5 text-slate-300">${item.category || 'N/A'}</td>
+          <td class="p-2.5 text-slate-400">${item.office_visit_date || item.PrintDate || 'N/A'}</td>
+          <td class="p-2.5 text-emerald-400 font-semibold">${item.box_no || 'N/A'}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function processExcelFiles() {
+      const fileInput = document.getElementById("excelFileInput");
+      const statusBox = document.getElementById("uploadStatus");
+
+      if (!fileInput.files || fileInput.files.length === 0) {
+        statusBox.classList.remove("hidden");
+        statusBox.className = "text-xs p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300";
+        statusBox.innerText = "⚠️ कृपया कम्तिमा एउटा Excel (.xlsx/.xls) फाइल रोज्नुहोस्।";
+        return;
+      }
+
+      statusBox.classList.remove("hidden");
+      statusBox.className = "text-xs p-3 rounded-lg bg-amber-950/50 border border-amber-800 text-amber-300";
+      statusBox.innerText = "Excel फाइलहरू प्रोसेस हुँदैछ...";
+
+      let totalAdded = 0;
+
+      for (let file of fileInput.files) {
+        try {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+
+          workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
+
+            jsonData.forEach(row => {
+              // Map Excel columns to standard database format
+              const newRecord = {
+                lid: row.lid || row.LID || "",
+                number: (row.number || row["लाइसेन्स नं"] || row.LicenseNo || "").toString().trim(),
+                app_name: (row.app_name || row["app _name"] || row.Name || row["नाम"] || "").toString().trim(),
+                mobile: row.mobile || "",
+                app_type: row.app_type || "unspecified",
+                category: row.category || row.Category || "",
+                office_visit_date: row.office_visit_date || row.Date || "",
+                box_no: row.box_no || row.BoxNo || ""
+              };
+
+              if (newRecord.number || newRecord.app_name) {
+                combinedDatabase.unshift(newRecord); // Add newly imported rows to top
+                totalAdded++;
+              }
+            });
+          });
+        } catch (err) {
+          console.error("Error reading file:", file.name, err);
+        }
+      }
+
+      renderTable();
+
+      statusBox.className = "text-xs p-3 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-300";
+      statusBox.innerText = `✅ सफलतापूर्वक ${totalAdded} नतिजाहरू थपियो! कुल रेकर्डहरू: ${combinedDatabase.length}`;
+      fileInput.value = "";
+    }
+
+    function exportMergedCSV() {
+      if (combinedDatabase.length === 0) return alert("कुनै विवरण उपलब्ध छैन।");
+
+      const csv = Papa.unparse(combinedDatabase);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", "merged_database_updated.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   </script>
 </body>
