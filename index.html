@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart License Status - Yatayat Vyawastha Karyalaya, Baglung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PapaParse library to parse live Google Sheet CSV -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
+  <style> body { font-family: 'Mukta', sans-serif; } </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col justify-between text-slate-800">
+
+  <!-- Header -->
+  <header class="bg-red-700 text-white shadow-lg">
+    <div class="max-w-xl mx-auto px-4 py-5 text-center">
+      <h1 class="text-2xl font-bold tracking-wide">यातायात व्यवस्था कार्यालय, बागलुङ</h1>
+      <p class="text-xs text-red-100 mt-1">गण्डकी प्रदेश, नेपाल | सवारी चालक अनुमतिपत्र (Smart License) स्थिति</p>
+    </div>
+  </header>
+
+  <!-- Main Search Box -->
+  <main class="max-w-md w-full mx-auto p-4 flex-grow flex flex-col justify-center">
+    <div class="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+      
+      <div class="text-center mb-6">
+        <h2 class="text-lg font-bold text-slate-800">स्मार्ट लाइसेन्स आइपुगेको जाँच्नुहोस्</h2>
+        <p class="text-xs text-slate-500 mt-1">Enter your License Number to check print status</p>
+      </div>
+
+      <form id="searchForm" onsubmit="checkLicense(event)" class="space-y-4">
+        <div>
+          <label for="licenseNo" class="block text-xs font-semibold text-slate-600 mb-1">
+            लाइसेन्स नम्बर (License Number)
+          </label>
+          <input 
+            type="text" 
+            id="licenseNo" 
+            placeholder="उदाहरण: 01-09-00850484" 
+            required 
+            class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-slate-800 font-mono uppercase text-base tracking-wider"
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          id="searchBtn"
+          class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 rounded-lg shadow transition duration-200">
+          खोज्नुहोस् (Search)
+        </button>
+      </form>
+
+      <!-- Output Container -->
+      <div id="resultBox" class="mt-6 hidden"></div>
+
+    </div>
+
+    <!-- Notice -->
+    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 shadow-sm">
+      <h3 class="font-bold mb-1 text-amber-800">आवश्यक जानकारी (Notice):</h3>
+      <ul class="list-disc list-inside space-y-1 text-amber-800">
+        <li>लाइसेन्स बुझ्न आउँदा सक्कल <strong>नागरिकता</strong> वा <strong>पुरानो लाइसेन्स / रसिद</strong> साथमा ल्याउनुहोला।</li>
+        <li>टेलिफोन सम्पर्क: <strong>068-522051</strong> (कार्यालय समयभित्र)</li>
+      </ul>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-200 bg-white">
+    <p>© 2026 यातायात व्यवस्था कार्यालय, बागलुङ</p>
+  </footer>
+
+  <script>
+    // Live Published Google Sheet CSV URL
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+
+    async function checkLicense(event) {
+      event.preventDefault();
+      
+      const inputVal = document.getElementById("licenseNo").value.trim().toUpperCase();
+      const resultBox = document.getElementById("resultBox");
+      const searchBtn = document.getElementById("searchBtn");
+
+      searchBtn.disabled = true;
+      searchBtn.innerText = "खोज्दैछ... (Searching...)";
+
+      try {
+        const response = await fetch(GOOGLE_SHEET_CSV_URL);
+        const csvText = await response.text();
+
+        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        const database = parsed.data;
+
+        // Search in database
+        const match = database.find(item => {
+          const lNo = item.number || item.LicenseNo || item["लाइसेन्स नं"] || "";
+          return lNo.trim().toUpperCase() === inputVal;
+        });
+
+        resultBox.classList.remove("hidden");
+
+        if (match) {
+          resultBox.innerHTML = `
+            <div class="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900">
+              <h3 class="font-bold text-base text-emerald-900 mb-2">✅ लाइसेन्स कार्यालयमा उपलब्ध छ!</h3>
+              <div class="space-y-1 text-xs bg-white/80 p-3 rounded-lg border border-emerald-200 font-mono">
+                <p><strong>नाम:</strong> ${match.app_name || match.Name || match['नाम'] || 'N/A'}</p>
+                <p><strong>लाइसेन्स नं:</strong> ${match.number || match.LicenseNo || inputVal}</p>
+                <p><strong>वर्ग (Category):</strong> ${match.category || 'N/A'}</p>
+                <p><strong>प्राप्त मिति:</strong> ${match.office_visit_date || match.PrintDate || 'N/A'}</p>
+                <p><strong>Box No:</strong> ${match.box_no || 'N/A'}</p>
+              </div>
+              <p class="mt-3 text-xs font-semibold text-emerald-800">
+                👉 तपाईं यातायात व्यवस्था कार्यालय, बागलुङमा गई कार्ड बुझिलिन सक्नुहुन्छ।
+              </p>
+            </div>
+          `;
+        } else {
+          resultBox.innerHTML = `
+            <div class="p-4 bg-rose-50 border border-rose-300 rounded-xl text-rose-900">
+              <h3 class="font-bold text-base text-rose-900 mb-1">⏳ कार्यालयमा आइपुगेको छैन</h3>
+              <p class="text-xs text-rose-800">
+                तपाईंले खोज्नुभएको लाइसेन्स नम्बर <strong>${inputVal}</strong> अझै बागलुङ कार्यालयमा प्राप्त भएको विवरणमा भेटिएन।
+              </p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultBox.classList.remove("hidden");
+        resultBox.innerHTML = `
+          <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+            डेटाबेससँग जोडिन सकेन। कृपया इन्टरनेट जाँच गरी पुनः प्रयास गर्नुहोला।
+          </div>
+        `;
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.innerText = "खोज्नुहोस् (Search)";
+      }
+    }
+  </script>
+</body>
+</html>
