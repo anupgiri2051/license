@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Portal - Smart License Management</title>
+  <title>Admin Portal - Cloud Firestore Management</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- XLSX Library to read local Excel files -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- PapaParse for Google Sheets CSV parsing -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
   <style> body { font-family: 'Mukta', sans-serif; } </style>
 </head>
@@ -22,7 +19,7 @@
         <p class="text-xs text-slate-400 mt-1">यातायात व्यवस्था कार्यालय, बागलुङ</p>
       </div>
 
-      <form onsubmit="handleLogin(event)" class="space-y-4">
+      <form id="loginForm" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">User ID</label>
           <input type="text" id="loginUser" required placeholder="User ID" class="w-full px-3 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-red-500"/>
@@ -50,58 +47,51 @@
       <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
         <div>
           <h1 class="text-xl font-bold text-red-500">यातायात व्यवस्था कार्यालय, बागलुङ</h1>
-          <p class="text-xs text-slate-400">Smart License Admin Control Panel</p>
+          <p class="text-xs text-slate-400">Google Cloud Firestore Admin Panel</p>
         </div>
-        <div class="flex gap-2">
-          <button onclick="logout()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold px-3 py-2 rounded-lg transition">
-            Logout 🔒
-          </button>
-        </div>
+        <button id="logoutBtn" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold px-3 py-2 rounded-lg transition">
+          Logout 🔒
+        </button>
       </div>
     </header>
 
     <main class="max-w-5xl mx-auto p-4 space-y-6">
 
-      <!-- EXCEL IMPORT SECTION -->
+      <!-- EXCEL CLOUD UPLOAD SECTION -->
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl space-y-4">
         <div>
-          <h2 class="text-lg font-bold text-white">📁 Import New Excel Files (.xlsx / .xls)</h2>
-          <p class="text-xs text-slate-400 mt-0.5">Upload additional Excel files here to parse and append/merge with your active database.</p>
+          <h2 class="text-lg font-bold text-white">☁️ Upload Excel Files Directly to Cloud Database</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Select your merged Excel file or new daily Excel sheets to push directly into Google Firestore.</p>
         </div>
 
         <div class="flex flex-col sm:flex-row items-center gap-3">
           <input 
             type="file" 
             id="excelFileInput" 
-            accept=".xlsx, .xls" 
+            accept=".xlsx, .xls, .csv" 
             multiple
             class="block w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-900 p-1"
           />
           <button 
-            onclick="processExcelFiles()" 
+            id="uploadBtn"
             class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg shadow transition whitespace-nowrap">
-            📥 Import Excel Data
+            🚀 Upload to Cloud
           </button>
         </div>
 
         <div id="uploadStatus" class="hidden text-xs p-3 rounded-lg border"></div>
       </div>
 
-      <!-- LIVE DATABASE TABLE SECTION -->
+      <!-- RECENT CLOUD RECORDS -->
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
         <div class="flex justify-between items-center mb-4">
           <div>
-            <h2 class="text-lg font-bold text-white">Live Database View</h2>
-            <p class="text-xs text-slate-400">कुल रेकर्ड: <span id="totalCount" class="font-bold text-emerald-400">0</span></p>
+            <h2 class="text-lg font-bold text-white">Cloud Database Preview (Latest 100)</h2>
+            <p class="text-xs text-slate-400">कुल लोड भएका रेकर्ड: <span id="totalCount" class="font-bold text-emerald-400">0</span></p>
           </div>
-          <div class="flex gap-2">
-            <button onclick="exportMergedCSV()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
-              💾 Export CSV
-            </button>
-            <button onclick="loadLiveDatabase()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
-              🔄 Refresh Data
-            </button>
-          </div>
+          <button id="refreshBtn" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
+            🔄 Refresh Cloud Data
+          </button>
         </div>
 
         <div class="overflow-x-auto max-h-96 border border-slate-700 rounded-lg">
@@ -129,97 +119,87 @@
   </div>
 
   <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-800 bg-slate-900">
-    <p>© 2026 यातायात व्यवस्था कार्यालय, बागलुङ - Admin Console</p>
+    <p>© 2026 यातायात व्यवस्था कार्यालय, बागलुङ - Cloud Admin Console</p>
   </footer>
 
-  <script>
-    const RAW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOWmx631nPfpJrcZFghc6VXPavqdL1uorOThM7CuJt4l5J1fqkAw8MGBV-2TtkrRgth6bGaz9XHl8n/pub?output=csv";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, writeBatch, collection, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const URLS_TO_TRY = [
-      RAW_URL,
-      "https://corsproxy.io/?" + encodeURIComponent(RAW_URL),
-      "https://api.allorigins.win/raw?url=" + encodeURIComponent(RAW_URL)
-    ];
+    const firebaseConfig = {
+      apiKey: "AIzaSyBKu0lh1Et4dgA1x16Kt1SRV0qHlisWkYg",
+      authDomain: "baglung-license-db.firebaseapp.com",
+      databaseURL: "https://baglung-license-db-default-rtdb.firebaseio.com",
+      projectId: "baglung-license-db",
+      storageBucket: "baglung-license-db.firebasestorage.app",
+      messagingSenderId: "313277714687",
+      appId: "1:313277714687:web:dc47df4aa703f0ec26fcca"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
     const AUTH_USER = "admin";
     const AUTH_PASS = "522051";
 
-    let combinedDatabase = [];
-
-    function handleLogin(e) {
+    document.getElementById("loginForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const u = document.getElementById("loginUser").value.trim();
       const p = document.getElementById("loginPass").value.trim();
       if (u === AUTH_USER && p === AUTH_PASS) {
         document.getElementById("loginOverlay").classList.add("hidden");
         document.getElementById("adminContent").classList.remove("hidden");
-        loadLiveDatabase();
+        loadCloudPreview();
       } else {
         document.getElementById("loginError").classList.remove("hidden");
       }
-    }
+    });
 
-    function logout() {
+    document.getElementById("logoutBtn").addEventListener("click", () => {
       document.getElementById("adminContent").classList.add("hidden");
       document.getElementById("loginOverlay").classList.remove("hidden");
-    }
+    });
 
-    async function fetchCSVData() {
-      for (const url of URLS_TO_TRY) {
-        try {
-          const res = await fetch(url);
-          if (res.ok) {
-            const text = await res.text();
-            if (text && text.length > 50) return text;
-          }
-        } catch (e) {
-          console.warn("Fetch failed for URL:", url, e);
-        }
-      }
-      throw new Error("Unable to fetch data from all endpoints.");
-    }
+    document.getElementById("refreshBtn").addEventListener("click", loadCloudPreview);
 
-    async function loadLiveDatabase() {
+    async function loadCloudPreview() {
       const tbody = document.getElementById("dataTableBody");
       const totalCount = document.getElementById("totalCount");
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Cloud बाट डेटा लोड हुँदैछ...</td></tr>`;
 
       try {
-        const csvText = await fetchCSVData();
-        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-        combinedDatabase = parsed.data;
+        const q = query(collection(db, "licenses"), limit(100));
+        const snapshot = await getDocs(q);
+        const records = [];
+        snapshot.forEach(doc => records.push(doc.data()));
 
-        renderTable();
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-400">Error loading database.</td></tr>`;
+        totalCount.innerText = records.length + (records.length === 100 ? "+" : "");
+
+        if (records.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">Cloud डेटाबेस खाली छ। Excel फाइल अपलोड गर्नुहोस्।</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = records.map((item, idx) => `
+          <tr class="hover:bg-slate-700/50">
+            <td class="p-2.5 text-slate-500">${idx + 1}</td>
+            <td class="p-2.5 font-mono text-amber-400 font-bold">${item.number || 'N/A'}</td>
+            <td class="p-2.5">${item.app_name || 'N/A'}</td>
+            <td class="p-2.5 text-slate-300">${item.category || 'N/A'}</td>
+            <td class="p-2.5 text-slate-400">${item.office_visit_date || 'N/A'}</td>
+            <td class="p-2.5 text-emerald-400 font-semibold">${item.box_no || 'N/A'}</td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-400">Error connecting to Firestore: ${err.message}</td></tr>`;
       }
     }
 
-    function renderTable() {
-      const tbody = document.getElementById("dataTableBody");
-      const totalCount = document.getElementById("totalCount");
-
-      totalCount.innerText = combinedDatabase.length;
-
-      if (combinedDatabase.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">खाली छ।</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = combinedDatabase.slice(0, 500).map((item, idx) => `
-        <tr class="hover:bg-slate-700/50">
-          <td class="p-2.5 text-slate-500">${idx + 1}</td>
-          <td class="p-2.5 font-mono text-amber-400 font-bold">${item.number || item.LicenseNo || 'N/A'}</td>
-          <td class="p-2.5">${item.app_name || item.Name || 'N/A'}</td>
-          <td class="p-2.5 text-slate-300">${item.category || 'N/A'}</td>
-          <td class="p-2.5 text-slate-400">${item.office_visit_date || item.PrintDate || 'N/A'}</td>
-          <td class="p-2.5 text-emerald-400 font-semibold">${item.box_no || 'N/A'}</td>
-        </tr>
-      `).join("");
-    }
-
-    async function processExcelFiles() {
+    document.getElementById("uploadBtn").addEventListener("click", async () => {
       const fileInput = document.getElementById("excelFileInput");
       const statusBox = document.getElementById("uploadStatus");
+      const uploadBtn = document.getElementById("uploadBtn");
 
       if (!fileInput.files || fileInput.files.length === 0) {
         statusBox.classList.remove("hidden");
@@ -228,64 +208,72 @@
         return;
       }
 
+      uploadBtn.disabled = true;
       statusBox.classList.remove("hidden");
       statusBox.className = "text-xs p-3 rounded-lg bg-amber-950/50 border border-amber-800 text-amber-300";
-      statusBox.innerText = "Excel फाइलहरू प्रोसेस हुँदैछ...";
+      statusBox.innerText = "Excel फाइलहरू पढ्दैछ...";
 
-      let totalAdded = 0;
+      const recordsMap = new Map();
 
       for (let file of fileInput.files) {
-        try {
-          const buffer = await file.arrayBuffer();
-          const workbook = XLSX.read(buffer, { type: 'array' });
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
 
-          workbook.SheetNames.forEach(sheetName => {
-            const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
 
-            jsonData.forEach(row => {
-              // Map Excel columns to standard database format
-              const newRecord = {
-                lid: row.lid || row.LID || "",
-                number: (row.number || row["लाइसेन्स नं"] || row.LicenseNo || "").toString().trim(),
-                app_name: (row.app_name || row["app _name"] || row.Name || row["नाम"] || "").toString().trim(),
-                mobile: row.mobile || "",
-                app_type: row.app_type || "unspecified",
-                category: row.category || row.Category || "",
-                office_visit_date: row.office_visit_date || row.Date || "",
-                box_no: row.box_no || row.BoxNo || ""
-              };
+          jsonData.forEach(row => {
+            const rawNum = (row.number || row["लाइसेन्स नं"] || row.LicenseNo || "").toString().trim().toUpperCase();
+            const cleanId = rawNum.replace(/[^A-Z0-9]/g, "");
 
-              if (newRecord.number || newRecord.app_name) {
-                combinedDatabase.unshift(newRecord); // Add newly imported rows to top
-                totalAdded++;
-              }
-            });
+            if (cleanId) {
+              recordsMap.set(cleanId, {
+                lid: String(row.lid || row.LID || "").trim(),
+                number: rawNum,
+                app_name: String(row.app_name || row["app _name"] || row.Name || row["नाम"] || "").trim(),
+                mobile: String(row.mobile || "").trim(),
+                app_type: String(row.app_type || "unspecified").trim(),
+                category: String(row.category || row.Category || "").trim(),
+                office_visit_date: String(row.office_visit_date || row.Date || "").trim(),
+                box_no: String(row.box_no || row.BoxNo || "").trim()
+              });
+            }
           });
-        } catch (err) {
-          console.error("Error reading file:", file.name, err);
-        }
+        });
       }
 
-      renderTable();
+      const uniqueRecords = Array.from(recordsMap.entries());
+      const CHUNK_SIZE = 450; // Firestore max batch limit is 500
+      let uploadedCount = 0;
 
-      statusBox.className = "text-xs p-3 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-300";
-      statusBox.innerText = `✅ सफलतापूर्वक ${totalAdded} नतिजाहरू थपियो! कुल रेकर्डहरू: ${combinedDatabase.length}`;
-      fileInput.value = "";
-    }
+      try {
+        for (let i = 0; i < uniqueRecords.length; i += CHUNK_SIZE) {
+          const chunk = uniqueRecords.slice(i, i + CHUNK_SIZE);
+          const batch = writeBatch(db);
 
-    function exportMergedCSV() {
-      if (combinedDatabase.length === 0) return alert("कुनै विवरण उपलब्ध छैन।");
+          chunk.forEach(([cleanId, recordData]) => {
+            const docRef = doc(db, "licenses", cleanId);
+            batch.set(docRef, recordData, { merge: true });
+          });
 
-      const csv = Papa.unparse(combinedDatabase);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute("download", "merged_database_updated.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+          await batch.commit();
+          uploadedCount += chunk.length;
+          statusBox.innerText = `☁️ Cloud मा अपलोड हुँदैछ... (${uploadedCount} / ${uniqueRecords.length})`;
+        }
+
+        statusBox.className = "text-xs p-3 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-300";
+        statusBox.innerText = `✅ सफलतापूर्वक ${uploadedCount} रेकर्डहरू Google Cloud Firestore मा सुरक्षित गरियो!`;
+        fileInput.value = "";
+        loadCloudPreview();
+      } catch (err) {
+        console.error(err);
+        statusBox.className = "text-xs p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300";
+        statusBox.innerText = `❌ अपलोड असफल भयो: ${err.message}`;
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
